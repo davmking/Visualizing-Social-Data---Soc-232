@@ -1,0 +1,175 @@
+---
+title: "king_dav_ps04"
+author: "Dav King"
+date: "3/23/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(socviz)
+library(tidycensus)
+library(tigris)
+library(viridis)
+options(tigris_use_cache = T)
+```
+
+```{r pop-names}
+pop_names <- tribble(
+    ~varname, ~clean_name,
+    "B01003_001", "pop",
+    "B01001B_001", "black",
+    "B01001A_001", "white",
+    "B01001H_001", "nh_white",
+    "B01001I_001", "hispanic",
+    "B01001D_001", "asian"
+  )
+  
+pop_names
+
+inc_names <- tribble(
+    ~varname, ~clean_name,
+    "S1901_C01_012", "median_hh_inc")
+```
+
+```{r county-data}
+fips_pop <- get_acs(geography = "county", 
+                    variables = pop_names$varname, 
+                    cache_table = TRUE) %>% 
+  mutate(variable = reduce2(pop_names$varname, 
+                            pop_names$clean_name, 
+                            str_replace, 
+                            .init = variable)) %>% 
+  select(-moe) %>% 
+  pivot_wider(names_from = variable, values_from = estimate) %>% 
+  rename(fips = GEOID, name = NAME) 
+```
+
+```{r income-data}
+fips_inc <- get_acs(geography = "county", 
+                    variables = inc_names$varname,  
+                    cache_table = TRUE) %>% 
+  mutate(variable = str_replace(variable, 
+                            inc_names$varname, 
+                            inc_names$clean_name)) %>% 
+  rename(fips = GEOID, name = NAME) 
+```
+
+```{r spatial-data}
+fips_map <- get_acs(geography = "county", 
+                    variables = "B01001_001", 
+                    geometry = TRUE,
+                    shift_geo = FALSE,
+                    cache_table = TRUE) %>% 
+  select(GEOID, NAME, geometry) %>% 
+  rename(fips = GEOID, name = NAME)
+```
+
+# Questions
+
+## Question 1
+
+```{r ex-01}
+fips_prop <- fips_pop %>% 
+  pivot_longer(cols = white:hispanic, names_to = "race",
+               values_to = "racepop") %>% 
+  group_by(name) %>% 
+  summarize(race, prop = (racepop/pop)*100000) %>% 
+  pivot_wider(names_from = race, values_from = prop)
+fips_prop
+```
+
+## Question 2
+
+```{r ex-02}
+full <- left_join(fips_map, fips_prop) %>% 
+  shift_geometry()
+```
+
+We know it works because our output is a data frame with the exact same number 
+of observations but one more row, and looking at it we can see that the one 
+additional row is geometry.
+
+## Question 3
+
+```{r ex-03}
+race_map <- function(race){ggplot(full, aes(fill = race, color = race)) +
+  geom_sf() +
+  theme_bw() +
+  scale_fill_viridis(trans = "reverse", option = "B",
+                     breaks = c(25000, 50000, 75000, 100000),
+                     labels = c("25K", "50K", "75K", "100K")) +
+  scale_color_viridis(trans = "reverse", option = "B") +
+  theme(legend.position = "bottom") +
+  guides(color = "none")
+}
+
+race_map(full$white) +
+  labs(title = "Density of White People in America",
+       fill = "White People per 100,000")
+
+race_map(full$black) +
+  labs(title = "Density of Black People in America",
+       fill = "Black People per 100,000")
+```
+
+## Question 4
+
+```{r ex-04}
+binned_race_map <- function(race){full %>% 
+  count(cut = cut_interval(race, 5)) %>% 
+    ggplot(aes(fill = factor(cut), color = factor(cut))) +
+      geom_sf() +
+      theme_bw() +
+      scale_fill_viridis(discrete = T, option = "B", direction = -1) +
+      scale_color_viridis(discrete = T, option = "B", direction = -1) +
+      guides(color = "none") +
+      theme(legend.position = "bottom",
+            legend.text = element_text(size = 6.5))
+}
+
+binned_race_map(full$white) +
+  labs(title = "Density of White People in America",
+       fill = "White People per 100,000")
+
+binned_race_map(full$black) +
+  labs(title = "Density of Black People in America",
+       fill = "Black People per 100,000")
+```
+
+I generally consider this to be a more informative map - since the human eye is 
+incapable of properly integrating across the entire continuous scale, even 
+though this has less actual data on it it remains a more informative, 
+big-picture map.
+
+## Question 5
+
+```{r ex-05}
+fips_map %>% 
+  left_join(fips_inc) %>% 
+  shift_geometry() %>% 
+  ggplot(aes(fill = estimate, color = estimate)) +
+  geom_sf() +
+  theme_bw() +
+  scale_fill_viridis(trans = "reverse", option = "A") +
+  scale_color_viridis(trans = "reverse", option = "A") +
+  theme(legend.position = "bottom") +
+  labs(title = "Median Household Income in America",
+       fill = "Med Household Income") +
+  guides(color = "none")
+```
+
+## Question 6
+
+```{r ex-06}
+fips_inc %>% 
+  arrange(desc(estimate)) %>% 
+  slice(1:10)
+fips_inc %>% 
+  arrange(estimate) %>% 
+  slice(1:5)
+```
