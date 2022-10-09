@@ -1,0 +1,39 @@
+---
+title: "Exploring NYC Complaints"
+author: "Dav King"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(socviz)
+library(nycomplaints)
+```
+
+
+# 1. Briefly Describe the Dataset
+
+# 2. Look at each column/variable in more detail
+
+```{r}
+
+```
+
+# 3. Explore in more depth: at least three polished plots or maps
+
+- Show your work.
+- Provide a motivation for and discussion of each plot.
+- You can merge in external data if you like. 
+
+```{r}
+
+```
+
+# 4. Short final discussion: Scope and limits of this data
